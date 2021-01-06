@@ -1,0 +1,71 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: git-vault
+  namespace: argo
+spec:
+  entrypoint: workflow-steps
+  serviceAccountName: argo
+  arguments:
+    parameters:
+      - name: git-repo-path
+        value: '/src'
+      - name: git-repo-url
+        value: 'github.com/jayfray12/argo-workflow-vault-integration.git'
+      - name: git-secret-name
+        value: 'git-creds'
+      - name: git-repo-revision
+        value: 'main'
+  volumeClaimTemplates:
+    - metadata:
+        name: workdir
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 500Mi
+  templates:
+  - name: git-clone
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "git-creds"
+        vault.hashicorp.com/secret-volume-path: "/home"
+        vault.hashicorp.com/agent-inject-secret-token: "secret/git-creds"
+        vault.hashicorp.com/agent-inject-template-token: |
+          {{- with secret "secret/git-creds" -}}
+            {{ .Data.data.token }}
+          {{- end }}
+    container:
+      image: alpine/git
+      command: [sh, -c]
+      args: ["git clone -q -b {{workflow.parameters.git-repo-revision}} https://`cat /home/token`@{{workflow.parameters.git-repo-url}} . && cat /home/token"]
+      workingDir: "/gen-source{{workflow.parameters.git-repo-path}}"
+      volumeMounts:
+        - name: workdir
+          mountPath: /gen-source
+  - name: git-push
+    inputs:
+      parameters:
+      - name: git-token
+    container:
+      image: alpine/git
+      command: [sh, -c]
+      args: ["bin/git-push.sh 'https://{{inputs.parameters.art-token}}@{{workflow.parameters.git-repo-url}}'"]
+      workingDir: "/gen-source{{workflow.parameters.git-repo-path}}"
+      volumeMounts:
+        - name: workdir
+          mountPath: /gen-source
+  - name: workflow-steps
+    dag:
+      tasks:
+        - name: git-clone-step
+          template: git-clone
+        - name: git-push-step
+          template: git-push-token
+          dependencies: [git-clone-step]
+          arguments:
+            parameters:
+              - name: git-token
+                value: '{{ printf "{{tasks.git-clone-step.outputs.result}}" }}'

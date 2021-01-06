@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: git-vault
+  namespace: argo
+spec:
+  entrypoint: git-clone
+  serviceAccountName: argo
+  arguments:
+    parameters:
+      - name: git-repo-path
+        value: '/src'
+      - name: git-repo-url
+        value: 'github.com/jayfray12/argo-workflow-vault-integration.git'
+      - name: git-secret-name
+        value: 'git-creds'
+      - name: git-repo-revision
+        value: 'main'
+  volumeClaimTemplates:
+    - metadata:
+        name: workdir
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 500Mi
+  templates:
+  - name: git-clone
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "git-creds"
+        vault.hashicorp.com/secret-volume-path: "/home"
+        vault.hashicorp.com/agent-inject-secret-token: "secret/git-creds"
+        vault.hashicorp.com/agent-inject-template-token: |
+          {{- with secret "secret/git-creds" -}}
+            {{ .Data.data.token }}
+          {{- end }}
+    container:
+      image: alpine/git
+      command: [sh, -c]
+      args: ["git clone -b {{workflow.parameters.git-repo-revision}} https://`cat /home/token`@{{workflow.parameters.git-repo-url}} . && git status && ls && cat README.md"]
+      workingDir: "/gen-source{{workflow.parameters.git-repo-path}}"
+      volumeMounts:
+        - name: workdir
+          mountPath: /gen-source

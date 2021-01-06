@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: git-input-artifact
+  namespace: argo
+spec:
+  entrypoint: git-clone
+  serviceAccountName: argo
+  arguments:
+    parameters:
+      - name: git-repo-path
+        value: '/src'
+      - name: git-repo-url
+        value: 'https://github.com/jayfray12/argo-workflow-vault-integration.git'
+      - name: git-secret-name
+        value: 'git-creds'
+      - name: git-repo-revision
+        value: 'main'
+  volumeClaimTemplates:
+    - metadata:
+        name: workdir
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 500Mi
+  templates:
+  - name: git-clone
+    inputs:
+      artifacts:
+        - name: argo-source
+          path: "/gen-source{{workflow.parameters.git-repo-path}}"
+          git:
+            repo: "{{workflow.parameters.git-repo-url}}"
+            revision: "{{workflow.parameters.git-repo-revision}}"
+            usernameSecret:
+              name: "{{workflow.parameters.git-secret-name}}"
+              key: username
+            passwordSecret:
+              name: "{{workflow.parameters.git-secret-name}}"
+              key: password
+    container:
+      image: alpine/git
+      command: [sh, -c]
+      args: ["git status && ls && cat README.md"]
+      workingDir: "/gen-source{{workflow.parameters.git-repo-path}}"
+      volumeMounts:
+        - name: workdir
+          mountPath: /gen-source
