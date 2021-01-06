@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  name: git-vault
+  name: git-vault-push
   namespace: argo
 spec:
   entrypoint: workflow-steps
@@ -52,7 +52,7 @@ spec:
     container:
       image: alpine/git
       command: [sh, -c]
-      args: ["bin/git-push.sh 'https://{{inputs.parameters.art-token}}@{{workflow.parameters.git-repo-url}}'"]
+      args: ["bin/git-push.sh 'https://{{inputs.parameters.git-token}}@{{workflow.parameters.git-repo-url}}'"]
       workingDir: "/gen-source{{workflow.parameters.git-repo-path}}"
       volumeMounts:
         - name: workdir
@@ -63,9 +63,9 @@ spec:
         - name: git-clone-step
           template: git-clone
         - name: git-push-step
-          template: git-push-token
+          template: git-push
           dependencies: [git-clone-step]
           arguments:
             parameters:
               - name: git-token
-                value: '{{ printf "{{tasks.git-clone-step.outputs.result}}" }}'
+                value: "{{tasks.git-clone-step.outputs.result}}"
