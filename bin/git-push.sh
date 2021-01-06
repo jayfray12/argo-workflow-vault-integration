@@ -1,6 +1,5 @@
-#!/bin/bash
 
-echo ${1}
+echo "Pushing Argo output file to Git!"
 
 git config user.name "Argo"
 git config user.email "you@example.com"
