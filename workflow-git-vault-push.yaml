@@ -50,7 +50,7 @@ spec:
       parameters:
       - name: git-token
     container:
-      image: alpine/git
+      image: dpet23/docker-alpine-git
       command: [sh, -c]
       args: ["bin/git-push.sh 'https://{{inputs.parameters.git-token}}@{{workflow.parameters.git-repo-url}}'"]
       workingDir: "/gen-source{{workflow.parameters.git-repo-path}}"
