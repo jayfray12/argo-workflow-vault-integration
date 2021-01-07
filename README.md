@@ -9,19 +9,27 @@ Argo gives you a convenient way to access OpenShift secrets but what if your cus
 
 ## Setup
 ### Argo installation on OpenShift
-Argo workflow install documentation can be found [here](https://argoproj.github.io/argo/installation/).  However, there is a [helm chart](https://github.com/argoproj/argo-helm) that can be used to perform the install.
-First we will need to add the Argo repo to have access to the helm chart.
-```
-helm repo add argo https://argoproj.github.io/argo-helm
-```
-Next we can create a project for Argo.
+Argo workflow install documentation can be found [here](https://argoproj.github.io/argo/installation/).  However, it is very easy to install and consists of 3 steps.<br/>
+
+1. Create a project for Argo.
 ```
 oc new-project argo
 ```
 
-Now we can perform an install.  We need to set the [Workflow Executor](https://github.com/argoproj/argo/blob/master/docs/workflow-executors.md) in order for it to run correct on OpenShift to `pns` (Process Namespace Sharing)
+2. Apply namespace-install.yaml
 ```
-helm install argo argo/argo --set controller.containerRuntimeExecutor=pns
+oc apply -n argo -f https://raw.githubusercontent.com/argoproj/argo/stable/manifests/namespace-install.yaml
+```
+
+3. Update argo workflow config map
+```
+oc edit cm workflow-controller-configmap
+```
+Add the following at the bottom of the file and save it.
+```
+data:
+  config: |
+    containerRuntimeExecutor: pns
 ```
 
 For ease of use we are going to grant the argo SA cluster admin rights.  You wouldn't want to do this in production.
@@ -104,12 +112,17 @@ spec:
     name: argo-server
     weight: 100
   port:
-    targetPort: web
+    targetPort: 2746
   wildcardPolicy: None
 ```
 
 ## Git Input Artifact
- Argo Workflows have a very convenient feature to easily get source code from git.  The GitArtifact allows for basic auth or SSH private key.  If you have your credentials stored in an OpenShift secret it is really easy to include.  See the [workflow-git-input-artifact.yaml](workflow-git-input-artifact.yaml) as an example.
+ Argo Workflows have a very convenient feature to easily get source code from git.  The GitArtifact allows for basic auth or SSH private key.  If you have your credentials stored in an OpenShift secret it is really easy to include.  See the [workflow-git-input-artifact.yaml](workflow-git-input-artifact.yaml) as an example.  In order to run this workflow you will need to create a Secret named `git-creds` in the `argo` namespace.
+ ```
+ oc create secret generic git-creds \
+   --from-literal=username=YOUR_USERNAME \
+   --from-literal=password=YOUR_PASSWORD
+ ```
 
  ## Argo & Vault
 Since Argo does not have built-in support for Vault, we cannot use the GitArtifact described above.  Lucky for us, we can take advantage of Vault’s ability to mount files on the pod filesystem.  In the [workflow-git-vault.yaml](workflow-git-vault.yaml) example our Vault secret is a token and we take advantage of the Vault sidecar injector by annotating our workflow step.
