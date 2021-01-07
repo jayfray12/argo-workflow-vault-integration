@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: git-vault
+  namespace: argo
+spec:
+  entrypoint: git-clone
+  serviceAccountName: argo
+  arguments:
+    parameters:
+      - name: git-repo-path
+        value: "{{ tpl (required "value 'git.path' required" .Values.git.path) $ }}"
+      - name: git-repo-url
+        value: "{{ tpl (required "value 'git.repo' required" .Values.git.repo) $ }}"
+      - name: git-secret-name
+        value: "{{ tpl (required "value 'secretName' required" .Values.secretName) $ }}"
+      - name: git-repo-revision
+        value: "{{ tpl (required "value 'git.branch' required" .Values.git.branch) $ }}"
+  volumeClaimTemplates:
+    - metadata:
+        name: workdir
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 500Mi
+  templates:
+  - name: git-clone
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: {{ default "git-creds" .Values.vault.role | quote }}
+        vault.hashicorp.com/secret-volume-path: {{ default "/home" .Values.vault.volumePath | quote }}
+        vault.hashicorp.com/agent-inject-secret-{{ required "value 'vault.fileName required'" .Values.vault.fileName }}: {{ default "secret/git-creds" .Values.vault.secret | quote }}
+        vault.hashicorp.com/agent-inject-template-{{ required "value 'vault.fileName required'" .Values.vault.fileName }}: |-
+          {{- required "value 'vault.template' required" .Values.vault.template | nindent 10 }}
+    container:
+      image: alpine/git
+      command: [sh, -c]
+      args: ['{{ printf "git clone -b {{workflow.parameters.git-repo-revision}} https://`cat /home/token`@{{workflow.parameters.git-repo-url}} . && git status && ls && cat README.md" }}']
+      workingDir: '{{ printf "/gen-source{{workflow.parameters.git-repo-path}}" }}'
+      volumeMounts:
+        - name: workdir
+          mountPath: /gen-source

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: argo-vault
+version: 0.0.1
+appVersion: 4.2
+description: Used for deploying Argo Workflows

@@ -1,0 +1,22 @@
+secretName: "git-creds"
+
+git:
+  path: "/src"
+  branch: "main"
+  # Path to repo for example: github.com/jayfray12/argo-workflow-vault-integration.git
+  #repo: "repo path"
+
+vault:
+  # Vault role for your secret
+  role: "git-creds"
+  # Volume path for secret in Pod
+  volumePath: "/home"
+  # Name of file
+  fileName: "token"
+  # vault secret path
+  secret: "secret/git-creds"
+  # Template for contents of secret file
+  template: |- 
+    {{- with secret "secret/git-creds" -}}
+      {{ .Data.data.token }}
+    {{- end }}

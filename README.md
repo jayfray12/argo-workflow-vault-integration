@@ -116,7 +116,7 @@ spec:
   wildcardPolicy: None
 ```
 
-## Git Input Artifact
+### Git Input Artifact
  Argo Workflows have a very convenient feature to easily get source code from git.  The GitArtifact allows for basic auth or SSH private key.  If you have your credentials stored in an OpenShift secret it is really easy to include.  See the [workflow-git-input-artifact.yaml](workflow-git-input-artifact.yaml) as an example.  In order to run this workflow you will need to create a Secret named `git-creds` in the `argo` namespace.
  ```
  oc create secret generic git-creds \
@@ -124,7 +124,7 @@ spec:
    --from-literal=password=YOUR_PASSWORD
  ```
 
- ## Argo & Vault
+ ### Argo & Vault
 Since Argo does not have built-in support for Vault, we cannot use the GitArtifact described above.  Lucky for us, we can take advantage of Vault’s ability to mount files on the pod filesystem.  In the [workflow-git-vault.yaml](workflow-git-vault.yaml) example our Vault secret is a token and we take advantage of the Vault sidecar injector by annotating our workflow step.
 
 In the [workflow-git-vault-push.yaml](workflow-git-vault-push.yaml) workflow we utilize the directed-acyclic graph (dag) option to define our workflow steps.  We have 2 steps 
@@ -135,3 +135,15 @@ In the [workflow-git-vault-push.yaml](workflow-git-vault-push.yaml) workflow we 
       git-push
 ```
 The git-clone step utilizes the vault sidecar injector to get our git token and clone our repo.  We pass that same token as a parameter to the `git-push` step to add a new file to our repo and take advantage of `VolumeClaimTemplates` in order to persist the cloned repo onto a shared volume that can be used by any step in the workflow.
+
+### Helm
+You can install all of the workflows utilizing the helm chart found in the [helm](helm) folder.  You can run the following to get the workflows installed
+```
+helm install my-workflows . --set git.repo=YOUR_REPO_HERE
+```
+If you look in the [templates](helm/templates) folder you will notice a difference from the workflows in the root of this repo.  Since Argo utilizes the double curly bracket just like Helm as a template directive, we need to "escape" Argo's parameters.  If we did not escape them, Helm would attempt to inject a value, resulting in an empty string instead of the intended Argo parameter.  There are other ways to escape the double curly braces, but I find the printf function to be the cleanest solution.
+```yaml
+git:
+  repo: '{{ printf "https://{{workflow.parameters.git-repo-url}}" }}'
+            
+```

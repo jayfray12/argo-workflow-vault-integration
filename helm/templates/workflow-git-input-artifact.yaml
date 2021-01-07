@@ -9,13 +9,13 @@ spec:
   arguments:
     parameters:
       - name: git-repo-path
-        value: '/src'
+        value: "{{ tpl (required "value 'git.path' required" .Values.git.path) $ }}"
       - name: git-repo-url
-        value: 'github.com/jayfray12/argo-workflow-vault-integration.git'
+        value: "{{ tpl (required "value 'git.repo' required" .Values.git.repo) $ }}"
       - name: git-secret-name
-        value: 'git-creds'
+        value: "{{ tpl (required "value 'secretName' required" .Values.secretName) $ }}"
       - name: git-repo-revision
-        value: 'main'
+        value: "{{ tpl (required "value 'git.branch' required" .Values.git.branch) $ }}"
   volumeClaimTemplates:
     - metadata:
         name: workdir
@@ -30,21 +30,21 @@ spec:
     inputs:
       artifacts:
         - name: argo-source
-          path: "/gen-source{{workflow.parameters.git-repo-path}}"
+          path: '{{ printf "/gen-source{{workflow.parameters.git-repo-path}}" }}'
           git:
-            repo: "https://{{workflow.parameters.git-repo-url}}"
-            revision: "{{workflow.parameters.git-repo-revision}}"
+            repo: '{{ printf "https://{{workflow.parameters.git-repo-url}}" }}'
+            revision: '{{ printf "{{workflow.parameters.git-repo-revision}}" }}'
             usernameSecret:
-              name: "{{workflow.parameters.git-secret-name}}"
+              name: '{{ printf "{{workflow.parameters.git-secret-name}}" }}'
               key: username
             passwordSecret:
-              name: "{{workflow.parameters.git-secret-name}}"
+              name: '{{ printf "{{workflow.parameters.git-secret-name}}" }}'
               key: password
     container:
       image: alpine/git
       command: [sh, -c]
       args: ["git status && ls && cat README.md"]
-      workingDir: "/gen-source{{workflow.parameters.git-repo-path}}"
+      workingDir: '{{ printf "/gen-source{{workflow.parameters.git-repo-path}}" }}'
       volumeMounts:
         - name: workdir
           mountPath: /gen-source
